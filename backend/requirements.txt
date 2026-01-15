@@ -27,3 +27,4 @@ social-auth-core==4.8.1
 sqlparse==0.5.4
 tzdata==2025.2
 urllib3==2.6.2
+psycopg2-binary==2.9.3 
