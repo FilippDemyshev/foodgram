@@ -17,8 +17,8 @@ def validate_time(value):
 def validate_name(value):
     if not re.match(r'^[-a-zA-Z0-9_]+$', value):
         raise ValidationError(
-            f'Slug может содержать только латинские буквы, цифры, '
-            f'дефисы и нижние подчеркивания.'
+            'Slug может содержать только латинские буквы, цифры, '
+            'дефисы и нижние подчеркивания.'
         )
 
 
