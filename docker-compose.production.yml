@@ -24,8 +24,8 @@ services:
       - static:/backend_static
       - media:/app/media
     depends_on:
-      - db:
-          condition: service_healthy
+      db:
+        condition: service_healthy
   frontend:
     env_file: .env
     image: feelok30/foodgram_frontend
