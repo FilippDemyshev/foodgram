@@ -28,6 +28,12 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'default_key')
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost, 127.0.0.1').split(',')
+CSRF_TRUSTED_ORIGINS = [
+    'https://philhost.work.gd',
+    'http://philhost.work.gd',
+    'https://89.169.187.4',
+    'http://89.169.187.4',
+]
 
 
 # Application definition
