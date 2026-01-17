@@ -1,12 +1,10 @@
-import base64
-
-from django.contrib.auth.password_validation import validate_password
-from django.core.files.base import ContentFile
+from django.shortcuts import get_object_or_404
+from drf_extra_fields.fields import Base64ImageField
 from rest_framework import serializers
 
 from recipes.models import (Favorite, Follow, Ingredient, Recipe,
                             RecipeIngredient, ShoppingCard, Tag, User)
-from recipes.validation import validate_amount, validate_username
+from recipes.validation import validate_amount
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -23,14 +21,15 @@ class IngredientSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class Base64ImageField(serializers.ImageField):
-    """Кастомное поле для работы с base64 изображениями."""
+class CustomBase64ImageField(Base64ImageField):
+    """Кастомное поле на основе Base64ImageField."""
 
     def to_internal_value(self, data):
-        if isinstance(data, str) and data.startswith('data:image'):
-            format, imgstr = data.split(';base64,')
-            ext = format.split('/')[-1]
-            data = ContentFile(base64.b64decode(imgstr), name='temp.' + ext)
+        """Обрабатываем пустые значения."""
+        if data is None or data == '' or data == 'null':
+            if self.required:
+                raise serializers.ValidationError("Это поле обязательно.")
+            return None
         return super().to_internal_value(data)
 
 
@@ -62,8 +61,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 class AvatarSerializer(serializers.Serializer):
     """Сериализатор аватара."""
-    avatar = Base64ImageField(required=True, allow_null=True,
-                              write_only=True)
+    avatar = CustomBase64ImageField(required=True, write_only=True)
 
     def update(self, instance, validated_data):
         """Обновляет аватар пользователя."""
@@ -153,7 +151,7 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         many=True, queryset=Tag.objects.all(), required=True
     )
     ingredients = RecipeIngredientWriteSerializer(many=True, required=True)
-    image = Base64ImageField(required=True, write_only=True)
+    image = CustomBase64ImageField(required=True,)
 
     class Meta:
         model = Recipe
@@ -179,13 +177,13 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
             tag_ids = [tag.id for tag in data['tags']]
             if len(tag_ids) != len(set(tag_ids)):
                 raise serializers.ValidationError(
-                    {'tags': ['Теги должны быть уникальными.']})
+                    {"tags": "Теги должны быть уникальными."})
 
         if 'ingredients' in data:
             ingredient_ids = [item['id'].id for item in data['ingredients']]
             if len(ingredient_ids) != len(set(ingredient_ids)):
                 raise serializers.ValidationError(
-                    {'ingredients': ['Ингредиенты должны быть уникальными.']})
+                    {"ingredients": "Ингредиенты должны быть уникальными."})
 
         return data
 
@@ -220,12 +218,12 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
 
         if ingredients_data is None:
             raise serializers.ValidationError({
-                'ingredients': 'Поле обязательно при обновлении рецепта.'
+                "ingredients": "Поле обязательно при обновлении рецепта."
             })
 
         if tags_data is None:
             raise serializers.ValidationError({
-                'tags': 'Поле обязательно при обновлении рецепта.'
+                "tags": "Поле обязательно при обновлении рецепта."
             })
 
         for attr, value in validated_data.items():
@@ -278,95 +276,69 @@ class ShoppingListSerializer(AdditionalSerializer):
         model = ShoppingCard
 
 
-class UserResponseSerializer(serializers.ModelSerializer):
-    """Сериализатор для отображения данных пользователя."""
+class RelationActionSerializer(serializers.Serializer):
+    """Базовый сериализатор для валидации действий с (избранное, корзина)."""
 
     class Meta:
-        model = User
-        fields = ('id', 'email', 'username', 'first_name', 'last_name')
-
-
-class SignUpSerializer(serializers.Serializer):
-    """Сериализатор для регистрации пользователей."""
-
-    email = serializers.EmailField(
-        required=True, max_length=254
-    )
-    username = serializers.CharField(
-        required=True, max_length=150, validators=[validate_username]
-    )
-    first_name = serializers.CharField(
-        required=True, max_length=150
-    )
-    last_name = serializers.CharField(
-        required=True, max_length=150
-    )
-    password = serializers.CharField(
-        required=True, max_length=128
-    )
+        model_class = None
+        error_already_exists = None
+        error_not_found = None
 
     def validate(self, data):
-        email = data['email']
-        username = data['username']
-        if User.objects.filter(email=email).exists():
-            raise serializers.ValidationError({
-                'email': 'Пользователь с таким email уже существует'
-            })
+        """Проверяет возможность выполнения операции (добавления/удаления)."""
+        request = self.context.get('request')
+        view = self.context.get('view')
 
-        if User.objects.filter(username=username).exists():
-            raise serializers.ValidationError({
-                'username': 'Пользователь с таким username уже существует'
-            })
+        if not request or not view:
+            raise serializers.ValidationError(
+                {"detail": "Отсутствует контекст запроса"})
 
-        return data
+        pk = view.kwargs.get('pk')
+        if not pk:
+            raise serializers.ValidationError(
+                {"detail": "Не указан ID рецепта"})
 
-    def to_representation(self, instance):
-        """Возвращаем данные через UserResponseSerializer после создания."""
-        return UserResponseSerializer(instance).data
+        recipe = get_object_or_404(Recipe, pk=pk)
+        user = request.user
 
-    def create(self, validated_data):
-        """Создание пользователя."""
-        user = User.objects.create_user(
-            email=validated_data['email'],
-            username=validated_data['username'],
-            first_name=validated_data['first_name'],
-            last_name=validated_data['last_name'],
-            password=validated_data['password'],
-            is_active=True
+        self.context['recipe'] = recipe
+        self.context['user'] = user
+
+        relation_qs = self.Meta.model_class.objects.filter(
+            author=user,
+            recipe=recipe
         )
-        return user
 
+        if request.method == 'POST':
+            if relation_qs.exists():
+                raise serializers.ValidationError({
+                    "detail": self.Meta.error_already_exists
+                })
 
-class PasswordSerializer(serializers.Serializer):
-    new_password = serializers.CharField(
-        max_length=128, validators=[validate_password], write_only=True
-    )
-    current_password = serializers.CharField(
-        max_length=128, validators=[validate_password], write_only=True
-    )
+        elif request.method == 'DELETE':
+            if not relation_qs.exists():
+                raise serializers.ValidationError({
+                    "detail": self.Meta.error_not_found
+                })
+            self.context['relation_instance'] = relation_qs.first()
 
-    def validate_current_password(self, value):
-        """Проверка, что текущий пароль указан верно."""
-        user = self.context['request'].user
-
-        if not user.check_password(value):
-            raise serializers.ValidationError('Неверный текущий пароль')
-        return value
-
-    def validate(self, data):
-        new_password = data['new_password']
-        current_password = data['current_password']
-        if new_password == current_password:
-            raise serializers.ValidationError({
-                'new_password': 'Новый пароль не может совпадать с текущим!',
-            })
         return data
 
-    def update(self, instance, validated_data):
-        """Обновляет пароль пользователя."""
-        instance.set_password(validated_data['new_password'])
-        instance.save()
-        return instance
+
+class FavoriteActionSerializer(RelationActionSerializer):
+    """Сериализатор для ВАЛИДАЦИИ действий с избранным."""
+    class Meta(RelationActionSerializer.Meta):
+        model_class = Favorite
+        error_already_exists = 'Рецепт уже в избранном'
+        error_not_found = 'Рецепт не найден в избранном'
+
+
+class ShoppingCardActionSerializer(RelationActionSerializer):
+    """Сериализатор для ВАЛИДАЦИИ действий с корзиной покупок."""
+    class Meta(RelationActionSerializer.Meta):
+        model_class = ShoppingCard
+        error_already_exists = 'Рецепт уже в корзине'
+        error_not_found = 'Рецепт не найден в корзине'
 
 
 class RecipeMinifiedSerializer(serializers.ModelSerializer):
@@ -418,3 +390,30 @@ class FollowSerializer(serializers.ModelSerializer):
             many=True,
             context=self.context
         ).data
+
+
+class FollowActionSerializer(serializers.Serializer):
+    """Сериализатор для создания/удаления подписок."""
+
+    def validate(self, data):
+        request = self.context.get('request')
+        pk = self.context['view'].kwargs.get('pk')
+        following = get_object_or_404(User, pk=pk)
+        user = request.user
+        follow = Follow.objects.filter(user=user, following=following)
+        if request.method == 'POST':
+            if user == following:
+                raise serializers.ValidationError(
+                    {"detail": "Нельзя подписаться на себя!"})
+
+            if follow.exists():
+                raise serializers.ValidationError(
+                    {"detail": "Вы уже подписаны на этого человека!"})
+        elif request.method == 'DELETE':
+            if not follow.exists():
+                raise serializers.ValidationError(
+                    {"detail": "Вы не подписаны на этого человека!"})
+        self.context['follow'] = follow.first()
+        self.context['following'] = following
+
+        return data

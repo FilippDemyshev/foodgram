@@ -1,18 +1,19 @@
 from django_filters import rest_framework as filters
+from rest_framework import filters as fl
 
-from recipes.models import Ingredient, Recipe, Tag
+from recipes.models import Recipe, Tag
 
 
 class RecipeFilter(filters.FilterSet):
     is_favorited = filters.BooleanFilter(method='filter_is_favorited')
     is_in_shopping_cart = filters.BooleanFilter(
-        method='filter_is_shopping_cart')
+        method='filter_is_shopping_cart'
+    )
     tags = filters.ModelMultipleChoiceFilter(
         field_name='tags__slug',
         to_field_name='slug',
         queryset=Tag.objects.all()
     )
-    author = filters.NumberFilter(field_name='author__id')
 
     class Meta:
         model = Recipe
@@ -21,11 +22,11 @@ class RecipeFilter(filters.FilterSet):
     def filter_is_favorited(self, queryset, name, value):
         """
         Фильтрация по избранному.
-        Только value=1 фильтрует, value=0 игнорируется.
+        Только value=True фильтрует, value=False игнорируется.
         """
         user = self.request.user
 
-        if int(value) == 1:
+        if value:
             if not user.is_authenticated:
                 return queryset.none()
             return queryset.filter(favorites__author=user)
@@ -34,11 +35,11 @@ class RecipeFilter(filters.FilterSet):
     def filter_is_shopping_cart(self, queryset, name, value):
         """
         Фильтрация по списку покупок.
-        Только value=1 фильтрует, value=0 игнорируется.
+        Только value=True фильтрует, value=False игнорируется.
         """
         user = self.request.user
 
-        if int(value) == 1:
+        if value:
             if not user.is_authenticated:
                 return queryset.none()
             return queryset.filter(shopping__author=user)
@@ -46,12 +47,10 @@ class RecipeFilter(filters.FilterSet):
         return queryset
 
 
-class IngredientFilter(filters.FilterSet):
-    name = filters.CharFilter(
-        lookup_expr='istartswith',
-        field_name='name'
-    )
+class IngredientSearchFilter(fl.SearchFilter):
+    """
+    Кастомный SearchFilter для ингредиентов.
+    Использует параметр ?name= вместо стандартного ?search=
+    """
 
-    class Meta:
-        model = Ingredient
-        fields = ['name']
+    search_param = 'name'

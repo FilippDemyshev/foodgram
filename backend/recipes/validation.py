@@ -2,15 +2,19 @@ import re
 
 from django.core.exceptions import ValidationError
 
+from .constants import MAX_COOKING_TIME, MIN_AMOUNT, MIN_COOKING_TIME
+
 
 def validate_time(value):
-    if value < 1:
+    if value < MIN_COOKING_TIME:
         raise ValidationError(
-            'Время приготовления не может быть  меньше одной минуты'
+            'Время приготовления не может быть '
+            f'меньше {MIN_COOKING_TIME} минуты'
         )
-    if value > 360:
+    if value > MAX_COOKING_TIME:
         raise ValidationError(
-            'Время приготовления не может быть больще 6 часов'
+            'Время приготовления не может быть '
+            f'больше {MAX_COOKING_TIME} минут'
         )
 
 
@@ -23,17 +27,14 @@ def validate_name(value):
 
 
 def validate_amount(value):
-    if value < 1:
+    if value < MIN_AMOUNT:
         raise ValidationError(
-            'Количесвто указанного ингридиента не может быть меньше 1'
+            f'Указанного ингредиента не может быть меньше {MIN_AMOUNT}'
         )
 
 
 def validate_username(value):
     """Валидатор для проверки, что username не 'me'."""
-    if value.lower() == 'me':
-        raise ValidationError('Имя пользователя "me" запрещено')
-
     pattern = r'^[\w.@+-]+\Z'
     if not re.match(pattern, value):
         raise ValidationError(

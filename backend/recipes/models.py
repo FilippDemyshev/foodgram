@@ -1,6 +1,11 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+from .constants import (INGREDIENT_MEASUREMENT_UNIT_MAX_LENGTH,
+                        INGREDIENT_NAME_MAX_LENGTH, RECIPE_NAME_MAX_LENGTH,
+                        TAG_NAME_MAX_LENGTH, TAG_SLUG_MAX_LENGTH,
+                        USER_EMAIL_MAX_LENGTH, USER_FIRST_NAME_MAX_LENGTH,
+                        USER_LAST_NAME_MAX_LENGTH, USER_USERNAME_MAX_LENGTH)
 from .validation import (validate_amount, validate_name, validate_time,
                          validate_username)
 
@@ -9,16 +14,26 @@ class User(AbstractUser):
     """Модель пользователя."""
 
     username = models.CharField(
-        "Имя пользователя",
-        max_length=150,
+        'Имя пользователя',
+        max_length=USER_USERNAME_MAX_LENGTH,
         unique=True,
         validators=[validate_username]
     )
-    first_name = models.CharField('Имя', max_length=150, blank=False)
-    last_name = models.CharField('Фамилия', max_length=150, blank=False)
-    email = models.EmailField("Электронная почта", max_length=254,
-                              unique=True)
-    password = models.CharField("Пароль", max_length=128, blank=False)
+    first_name = models.CharField(
+        'Имя',
+        max_length=USER_FIRST_NAME_MAX_LENGTH,
+        blank=False
+    )
+    last_name = models.CharField(
+        'Фамилия',
+        max_length=USER_LAST_NAME_MAX_LENGTH,
+        blank=False
+    )
+    email = models.EmailField(
+        'Электронная почта',
+        max_length=USER_EMAIL_MAX_LENGTH,
+        unique=True
+    )
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
 
     USERNAME_FIELD = 'email'
@@ -26,8 +41,8 @@ class User(AbstractUser):
 
     class Meta:
         """Метаданные модели пользователя."""
-        verbose_name = "Пользователь"
-        verbose_name_plural = "Пользователи"
+        verbose_name = 'Пользователь'
+        verbose_name_plural = 'Пользователи'
 
     def __str__(self):
         """Строковое представление пользователя."""
@@ -36,9 +51,16 @@ class User(AbstractUser):
 
 class Tag(models.Model):
     """Модель тега."""
-    name = models.CharField(max_length=32, verbose_name='Название')
-    slug = models.CharField(max_length=32, unique=True,
-                            validators=[validate_name], verbose_name='Слаг')
+    name = models.CharField(
+        max_length=TAG_NAME_MAX_LENGTH,
+        verbose_name='Название'
+    )
+    slug = models.CharField(
+        max_length=TAG_SLUG_MAX_LENGTH,
+        unique=True,
+        validators=[validate_name],
+        verbose_name='Слаг'
+    )
 
     class Meta:
         """Метаданные модели тега."""
@@ -47,15 +69,19 @@ class Tag(models.Model):
 
     def __str__(self):
         """Строковое представление тега."""
-        return f"{self.name}"
+        return f'{self.name}'
 
 
 class Ingredient(models.Model):
     """Модель ингредиента."""
-    name = models.CharField(max_length=128,
-                            verbose_name='Название ингредиента')
-    measurement_unit = models.CharField(max_length=64,
-                                        verbose_name='Единица измерения')
+    name = models.CharField(
+        max_length=INGREDIENT_NAME_MAX_LENGTH,
+        verbose_name='Название ингредиента'
+    )
+    measurement_unit = models.CharField(
+        max_length=INGREDIENT_MEASUREMENT_UNIT_MAX_LENGTH,
+        verbose_name='Единица измерения'
+    )
 
     class Meta:
         """Метаданные модели ингредиента."""
@@ -64,7 +90,7 @@ class Ingredient(models.Model):
 
     def __str__(self):
         """Строковое представление ингредиента."""
-        return f"{self.name}, {self.measurement_unit}"
+        return f'{self.name}, {self.measurement_unit}'
 
 
 class Recipe(models.Model):
@@ -75,12 +101,20 @@ class Recipe(models.Model):
         verbose_name='Автор',
         related_name='recipes'
     )
-    name = models.CharField(max_length=256, verbose_name='Блюдо')
-    image = models.ImageField(upload_to='recipes/images/',
-                              verbose_name='Картинка')
+    name = models.CharField(
+        max_length=RECIPE_NAME_MAX_LENGTH,
+        verbose_name='Блюдо'
+    )
+    image = models.ImageField(
+        upload_to='recipes/images/',
+        verbose_name='Картинка'
+    )
     text = models.TextField(verbose_name='Описание')
-    tags = models.ManyToManyField(Tag, verbose_name='Тег',
-                                  related_name='recipes')
+    tags = models.ManyToManyField(
+        Tag,
+        verbose_name='Тег',
+        related_name='recipes'
+    )
     cooking_time = models.PositiveSmallIntegerField(
         validators=[validate_time],
         verbose_name='Время приготовления'
@@ -99,7 +133,7 @@ class Recipe(models.Model):
 
     def __str__(self):
         """Строковое представление рецепта."""
-        return f"{self.name} (автор: {self.author.username})"
+        return f'{self.name} (автор: {self.author.username})'
 
 
 class RecipeIngredient(models.Model):
@@ -128,29 +162,39 @@ class RecipeIngredient(models.Model):
 
     def __str__(self):
         """Строковое представление ингредиента рецепта."""
-        return (f"{self.recipe.name} {self.ingredient.name} - {self.amount} "
-                f"{self.ingredient.measurement_unit}")
+        return (f'{self.recipe.name} {self.ingredient.name} - {self.amount} '
+                f'{self.ingredient.measurement_unit}')
 
 
-class Favorite(models.Model):
-    """Модель избранного."""
+class UserRecipeRelation(models.Model):
+    """Абстрактная базовая модель для связи пользователя с рецептом."""
     author = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         verbose_name='Автор',
-        related_name='favorites'
     )
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
         verbose_name='Рецепт',
-        related_name='favorites'
     )
 
     class Meta:
+        abstract = True
+        default_related_name = '%(class)s'
+
+    def __str__(self):
+        return f'{self.author.username} — {self.recipe.name}'
+
+
+class Favorite(UserRecipeRelation):
+    """Модель избранного."""
+
+    class Meta(UserRecipeRelation.Meta):
         """Метаданные модели избранного."""
         verbose_name = 'Избранное'
         verbose_name_plural = 'Избранное'
+        default_related_name = 'favorites'
 
     def __str__(self):
         """Строковое представление избранного."""
@@ -158,25 +202,14 @@ class Favorite(models.Model):
                 f'в избранное')
 
 
-class ShoppingCard(models.Model):
+class ShoppingCard(UserRecipeRelation):
     """Модель корзины покупок."""
-    author = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        verbose_name='Автор',
-        related_name='shopping'
-    )
-    recipe = models.ForeignKey(
-        Recipe,
-        on_delete=models.CASCADE,
-        verbose_name='Рецепт',
-        related_name='shopping'
-    )
 
-    class Meta:
+    class Meta(UserRecipeRelation.Meta):
         """Метаданные модели корзины."""
         verbose_name = 'Корзина'
         verbose_name_plural = 'Корзина'
+        default_related_name = 'shopping'
 
     def __str__(self):
         """Строковое представление корзины."""
@@ -187,10 +220,16 @@ class ShoppingCard(models.Model):
 class Follow(models.Model):
     """Модель для подписок пользователей друг на друга."""
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE,
-                             related_name='follower')
-    following = models.ForeignKey(User, on_delete=models.CASCADE,
-                                  related_name='following')
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='follower'
+    )
+    following = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='following'
+    )
 
     class Meta:
         """Мета-класс для настройки модели Follow."""
