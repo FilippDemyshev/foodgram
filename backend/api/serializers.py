@@ -21,8 +21,8 @@ class IngredientSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class CustomBase64ImageField(Base64ImageField):
-    """Кастомное поле на основе Base64ImageField."""
+class EmptyHandlingBase64ImageField(Base64ImageField):
+    """Base64ImageField, корректно обрабатывающий пустые значения."""
 
     def to_internal_value(self, data):
         """Обрабатываем пустые значения."""
@@ -61,7 +61,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 class AvatarSerializer(serializers.Serializer):
     """Сериализатор аватара."""
-    avatar = CustomBase64ImageField(required=True, write_only=True)
+    avatar = EmptyHandlingBase64ImageField(required=True, write_only=True)
 
     def update(self, instance, validated_data):
         """Обновляет аватар пользователя."""
@@ -151,7 +151,7 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         many=True, queryset=Tag.objects.all(), required=True
     )
     ingredients = RecipeIngredientWriteSerializer(many=True, required=True)
-    image = CustomBase64ImageField(required=True,)
+    image = EmptyHandlingBase64ImageField(required=True,)
 
     class Meta:
         model = Recipe

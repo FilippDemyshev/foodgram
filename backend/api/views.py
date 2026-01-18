@@ -4,14 +4,14 @@ from django.db.models import Sum
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.serializers import SetPasswordSerializer, UserCreateSerializer
+from djoser.views import UserViewSet as DjoserUserViewSet
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from recipes.models import (Follow, Ingredient, Recipe,
-                            Tag, User)
+from recipes.models import Follow, Ingredient, Recipe, Tag, User
 
 from .filers import IngredientSearchFilter, RecipeFilter
 from .permissions import IsAuthorOrReadOnlyPermission
@@ -39,6 +39,14 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ['^name']
 
 
+class PasswordChangeViewSet(DjoserUserViewSet):
+    """ViewSet для смены пароля через Djoser."""
+
+    def get_serializer_class(self):
+        if self.action == 'set_password':
+            return SetPasswordSerializer
+
+
 class UserViewSet(viewsets.ModelViewSet):
     """ViewSet для работы с пользователями."""
     queryset = User.objects.all()
@@ -47,17 +55,8 @@ class UserViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'delete', 'put']
     pagination_class = LimitOffsetPagination
 
-    # extra_actions = {
-    #     'users_own_profile': UserSerializer,
-    #     'my_avatar': AvatarSerializer,
-    #     'subscriptions': FollowSerializer,
-    #     'set_password': SetPasswordSerializer,
-    # }
-
     def get_serializer_class(self):
         """Возвращает соответствующий сериализатор для действия."""
-        # if self.action in self.extra_actions:
-        #     return self.extra_actions[self.action]
         if self.action in ("create", ):
             return UserCreateSerializer
         return UserSerializer
@@ -66,7 +65,6 @@ class UserViewSet(viewsets.ModelViewSet):
         methods=["get"],
         detail=False,
         url_path="me",
-        # serializer_class=UserSerializer,
         permission_classes=[IsAuthenticated]
     )
     def users_own_profile(self, request):
@@ -79,7 +77,6 @@ class UserViewSet(viewsets.ModelViewSet):
         methods=["put", "delete"],
         detail=False,
         url_path="me/avatar",
-        # serializer_class=AvatarSerializer,
         permission_classes=[IsAuthenticated]
     )
     def my_avatar(self, request):
@@ -157,20 +154,6 @@ class UserViewSet(viewsets.ModelViewSet):
             paginated_queryset, context={
                 'request': request, 'recipes_limit': recipes_limit}, many=True)
         return self.get_paginated_response(serializer.data)
-
-    @action(detail=False, methods=['post'],
-            permission_classes=[IsAuthenticated])
-    def set_password(self, request):
-        serializer = SetPasswordSerializer(
-            data=request.data,
-            context={'request': request}
-        )
-        if serializer.is_valid():
-            user = request.user
-            user.set_password(serializer.validated_data['new_password'])
-            user.save()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, *args, **kwargs):
         return Response(
