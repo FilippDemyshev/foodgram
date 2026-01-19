@@ -1,7 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from api.views import (IngredientViewSet, PasswordChangeViewSet, RecipeViewSet,
+from api.views import (IngredientViewSet, RecipeViewSet,
                        TagViewSet, UserViewSet)
 
 router = DefaultRouter()
@@ -14,10 +14,6 @@ router.register('tags', TagViewSet, basename='tags')
 
 urlpatterns = [
     path('auth/', include('djoser.urls.authtoken')),
-    path(
-        'users/set_password/',
-        PasswordChangeViewSet.as_view({'post': 'set_password'}),
-        name='set_password'
-    ),
     path('', include(router.urls)),
+    path('', include('djoser.urls'))
 ]

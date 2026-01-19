@@ -3,7 +3,6 @@ from datetime import datetime
 from django.db.models import Sum
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
-from djoser.serializers import SetPasswordSerializer, UserCreateSerializer
 from djoser.views import UserViewSet as DjoserUserViewSet
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -39,45 +38,33 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ['^name']
 
 
-class PasswordChangeViewSet(DjoserUserViewSet):
-    """ViewSet для смены пароля через Djoser."""
-
-    def get_serializer_class(self):
-        if self.action == 'set_password':
-            return SetPasswordSerializer
-
-
-class UserViewSet(viewsets.ModelViewSet):
+class UserViewSet(DjoserUserViewSet):
     """ViewSet для работы с пользователями."""
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [AllowAny]
     http_method_names = ['get', 'post', 'delete', 'put']
     pagination_class = LimitOffsetPagination
 
-    def get_serializer_class(self):
-        """Возвращает соответствующий сериализатор для действия."""
-        if self.action in ("create", ):
-            return UserCreateSerializer
-        return UserSerializer
-
-    @action(
-        methods=["get"],
-        detail=False,
-        url_path="me",
-        permission_classes=[IsAuthenticated]
-    )
-    def users_own_profile(self, request):
-        """Возвращает профиль текущего пользователя."""
-        user = request.user
-        serializer = UserSerializer(user, context={"request": request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    def get_permissions(self):
+        """
+        Настройка permissions:
+        - Список пользователей и просмотр профиля: AllowAny
+        - Создание пользователя: AllowAny
+        - Обновление/удаление: IsAuthenticated
+        - Кастомные actions (me, subscribe и т.д.): IsAuthenticated
+        """
+        if self.action in ['list', 'retrieve', 'create']:
+            return [AllowAny()]
+        elif self.action in ['me', 'my_avatar', 'subscribe', 'subscriptions']:
+            return [IsAuthenticated()]
+        elif self.action in ['update', 'destroy']:
+            return [IsAuthenticated()]
+        return [AllowAny()]
 
     @action(
         methods=["put", "delete"],
         detail=False,
         url_path="me/avatar",
-        permission_classes=[IsAuthenticated]
     )
     def my_avatar(self, request):
         """Управляет аватаром текущего пользователя."""
@@ -113,11 +100,11 @@ class UserViewSet(viewsets.ModelViewSet):
         methods=["post", "delete"],
         detail=True,
         url_path="subscribe",
-        permission_classes=[IsAuthenticated]
     )
-    def subscribe(self, request, pk):
+    def subscribe(self, request, id=None):
         user = request.user
         recipes_limit = request.query_params.get('recipes_limit')
+
         if request.method == 'POST':
             valid_serializer = FollowActionSerializer(
                 data={}, context={'request': request, 'view': self})
@@ -141,7 +128,6 @@ class UserViewSet(viewsets.ModelViewSet):
         detail=False,
         url_path="subscriptions",
         serializer_class=FollowSerializer,
-        permission_classes=[IsAuthenticated],
         pagination_class=LimitOffsetPagination
     )
     def subscriptions(self, request):

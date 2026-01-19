@@ -397,7 +397,7 @@ class FollowActionSerializer(serializers.Serializer):
 
     def validate(self, data):
         request = self.context.get('request')
-        pk = self.context['view'].kwargs.get('pk')
+        pk = self.context['view'].kwargs.get('id')
         following = get_object_or_404(User, pk=pk)
         user = request.user
         follow = Follow.objects.filter(user=user, following=following)
