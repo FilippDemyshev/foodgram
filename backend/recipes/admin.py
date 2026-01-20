@@ -22,6 +22,8 @@ class RecipeIngredientInline(admin.TabularInline):
     """Inline-форма для управления ингредиентами рецепта с количеством."""
     model = RecipeIngredient
     extra = 3
+    min_num = 1
+    validate_min = True
     autocomplete_fields = ['ingredient']
 
 
