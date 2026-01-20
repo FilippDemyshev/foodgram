@@ -18,6 +18,13 @@ class UserAdmin(admin.ModelAdmin):
     )
 
 
+class RecipeIngredientInline(admin.TabularInline):
+    """Inline-форма для управления ингредиентами рецепта с количеством."""
+    model = RecipeIngredient
+    extra = 3
+    autocomplete_fields = ['ingredient']
+
+
 class RecipeAdmin(admin.ModelAdmin):
     """Админ-панель для модели рецепта."""
     list_display = (
@@ -25,6 +32,7 @@ class RecipeAdmin(admin.ModelAdmin):
         'name',
         'text',
         'display_tags',
+        'get_ingredients',
         'cooking_time',
         'favorite_count'
     )
@@ -34,11 +42,19 @@ class RecipeAdmin(admin.ModelAdmin):
     )
     list_filter = ('tags',)
 
+    inlines = [RecipeIngredientInline]
+
     def display_tags(self, obj):
         """Отображение тегов рецепта."""
         return ", ".join([tag.name for tag in obj.tags.all()])
 
     display_tags.short_description = 'Теги'
+
+    def get_ingredients(self, obj):
+        return ", ".join([
+            f"{ing.name}" for ing in obj.ingredients.all()[:3]
+        ])
+    get_ingredients.short_description = 'Ингредиенты'
 
     def favorite_count(self, obj):
         """Количество добавлений рецепта в избранное."""
@@ -63,4 +79,3 @@ admin.site.register(Recipe, RecipeAdmin)
 admin.site.register(Favorite)
 admin.site.register(Ingredient, IngredientAdmin)
 admin.site.register(ShoppingCard)
-admin.site.register(RecipeIngredient)
