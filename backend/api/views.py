@@ -168,7 +168,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def get_recipe_url(self, request, pk):
         """Возвращает абсолютный URL рецепта."""
         recipe = self.get_object()
-        return Response({'short-link': request.build_absolute_uri(recipe)})
+        absolute_url = request.build_absolute_uri(f'/api/recipes/{recipe.pk}/')
+        return Response({'short-link': absolute_url})
 
     @action(methods=["post", "delete"], detail=True, url_path="favorite",
             permission_classes=[IsAuthenticated])
