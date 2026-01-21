@@ -6,13 +6,13 @@ from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet as DjoserUserViewSet
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from recipes.models import Follow, Ingredient, Recipe, Tag, User
 
 from .filers import IngredientSearchFilter, RecipeFilter
+from .pagination import FoodgramPageNumberPagination
 from .permissions import IsAuthorOrReadOnlyPermission
 from .serializers import (AvatarSerializer, FavoriteActionSerializer,
                           FavoriteSerializer, FollowActionSerializer,
@@ -43,7 +43,7 @@ class UserViewSet(DjoserUserViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     http_method_names = ['get', 'post', 'delete', 'put']
-    pagination_class = LimitOffsetPagination
+    pagination_class = FoodgramPageNumberPagination
 
     def get_permissions(self):
         """
@@ -128,7 +128,7 @@ class UserViewSet(DjoserUserViewSet):
         detail=False,
         url_path="subscriptions",
         serializer_class=FollowSerializer,
-        pagination_class=LimitOffsetPagination
+        pagination_class=FoodgramPageNumberPagination
     )
     def subscriptions(self, request):
         user = request.user
@@ -154,7 +154,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'patch', 'delete']
     lookup_field = 'pk'
     permission_classes = (IsAuthorOrReadOnlyPermission, )
-    pagination_class = LimitOffsetPagination
+    pagination_class = FoodgramPageNumberPagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = RecipeFilter
 
